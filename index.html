@@ -101,6 +101,28 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--focus);outline-
 .sw{width:30px;height:30px;border-radius:50%;border:2px solid transparent;cursor:pointer;padding:0}
 .sw[aria-pressed="true"]{border-color:var(--ink)}
 .card .btn{width:100%}
+.lobby{position:fixed;inset:0;display:grid;place-items:center;background:rgba(5,8,10,.38);padding:20px;overflow-y:auto}
+.lobby[hidden]{display:none}
+.lobby .card{width:min(380px,100%)}
+.lobby h2.big{font-size:34px;margin-bottom:4px}
+.lobby label{display:block;font-size:13px;color:var(--ink-dim);margin:0 0 6px}
+.lobby .gap{height:12px}
+.lobby .or{display:flex;align-items:center;gap:10px;color:var(--ink-dim);font-size:13px;margin:20px 0 12px}
+.lobby .or::before,.lobby .or::after{content:"";flex:1;height:1px;background:var(--line)}
+.joinrow{display:flex;gap:8px}
+.joinrow input{flex:1;min-width:0}
+.joinrow .btn{width:auto!important;white-space:nowrap}
+.rejoin{margin-bottom:18px;padding:12px 14px;border:1px solid var(--line);border-radius:14px;font-size:14px;color:var(--ink-dim)}
+.rejoin[hidden]{display:none}
+.rejoin .btn{margin-top:10px}
+.credit{margin:22px 0 0!important;font-size:12px!important;line-height:1.6;color:var(--ink-dim);text-align:center}
+.credit a{color:inherit}
+.credit-fixed{position:fixed;right:16px;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);font-size:11px;color:var(--ink-dim);opacity:.6;text-align:right;line-height:1.5}
+.credit-fixed a{color:inherit}
+#roomTitle{margin:4px 0 0;font-family:"Gowun Batang",serif;font-size:16px;color:var(--ink)}
+#roomTitle:empty{display:none}
+body.in-lobby .top h1,body.in-lobby .dock,body.in-lobby .chips,body.in-lobby #now,body.in-lobby #vol,body.in-lobby #who,body.in-lobby #roomTitle,body.in-lobby .credit-fixed{display:none!important}
+@media (max-width:900px){ .credit-fixed{display:none} }
 @media (max-width:520px){ .btn{font-size:14px;padding:10px 14px} #who{font-size:13px} #vol{width:84px} }
 </style>
 </head>
@@ -110,6 +132,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--focus);outline-
 <div class="top">
   <div>
     <h1>모닥불</h1>
+    <p id="roomTitle"></p>
     <p id="who">불을 피우는 중</p>
   </div>
   <div class="right">
@@ -120,6 +143,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--focus);outline-
       <button class="chip" id="soundBtn" type="button">장작 소리 켜기</button>
       <button class="chip" id="photoBtn" type="button">기념사진</button>
       <button class="chip" id="renameBtn" type="button">이름 바꾸기</button>
+      <button class="chip" id="leaveBtn" type="button">퇴장하기</button>
     </div>
     <input id="vol" type="range" min="0" max="1" step="0.05" value="0.6" aria-label="노래 볼륨" hidden>
     <div id="now"></div>
@@ -142,6 +166,29 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--focus);outline-
     <input id="chatInput" maxlength="80" placeholder="불 앞에서 한마디" aria-label="채팅">
     <button class="btn" type="submit">보내기</button>
   </form>
+</div>
+
+<div class="credit-fixed">made by 송광진<br><a href="mailto:9544182@naver.com">9544182@naver.com</a></div>
+
+<div class="lobby" id="lobby" hidden>
+  <div class="card">
+    <h2 class="big">모닥불</h2>
+    <p>친구들이랑 말없이 같이 불 쬐는 곳. 방을 만들고 초대 링크를 보내면 같이 앉을 수 있어요.</p>
+    <div class="rejoin" id="rejoin" hidden>
+      <span id="rejoinText">불 앞에서 일어났어요.</span>
+      <button class="btn" id="rejoinBtn" type="button">다시 앉기</button>
+    </div>
+    <label for="roomNameInput">방 이름 (안 써도 돼요)</label>
+    <input id="roomNameInput" maxlength="20" placeholder="예: 금요일 밤 모닥불">
+    <div class="gap"></div>
+    <button class="btn primary" id="createBtn" type="button">새 방 만들기</button>
+    <div class="or">받은 초대가 있다면</div>
+    <form class="joinrow" id="joinForm" autocomplete="off">
+      <input id="joinInput" placeholder="초대 링크나 방 코드" aria-label="초대 링크나 방 코드">
+      <button class="btn" type="submit">들어가기</button>
+    </form>
+    <p class="credit">made by 송광진<br><a href="mailto:9544182@naver.com">9544182@naver.com</a></p>
+  </div>
 </div>
 
 <div class="sit" id="sit" hidden>
@@ -174,7 +221,7 @@ const EMOS=["👏","😂","🔥","❤️","🍻","🙏","😴","👻","🎉"];
 const me={name:clean(store.get("fire.name")),hue:+store.get("fire.hue"),logs:[],roast:null,say:null,emo:null,dust:null,wish:null,typing:false,away:false};
 if(!HUES.includes(me.hue)){me.hue=HUES[Math.floor(Math.random()*HUES.length)];store.set("fire.hue",me.hue)}
 
-let room=null,myPeer=null;const loadedAt=performance.now();
+let room=null,myPeer=null,loadedAt=performance.now();
 const known=new Map(), bubbles=new Map();
 const flying=[],flames=[],embers=[],floats=[];
 let W=0,H=0,DPR=1,K=1,stars=[],treesFar=[],treesNear=[],colors={};
@@ -471,7 +518,7 @@ function setAway(v){if(me.away===v)return;me.away=v;pushPresence()}
 ["pointerdown","keydown","pointermove"].forEach(ev=>addEventListener(ev,()=>{lastAct=Date.now();if(me.away&&!document.hidden)setAway(false)},{passive:true}));
 document.addEventListener("visibilitychange",()=>{clearTimeout(hideTimer);if(document.hidden)hideTimer=setTimeout(()=>setAway(true),30000);else{lastAct=Date.now();setAway(false)}});
 setInterval(()=>{if(!me.away&&Date.now()-lastAct>5*60e3)setAway(true)},15000);
-addEventListener("keydown",e=>{if(e.key==="Enter"&&sit.hidden&&!(e.target instanceof HTMLInputElement)&&!(e.target instanceof HTMLButtonElement)){e.preventDefault();chatInput.focus()}});
+addEventListener("keydown",e=>{if(e.key==="Enter"&&sit.hidden&&lobby.hidden&&!(e.target instanceof HTMLInputElement)&&!(e.target instanceof HTMLButtonElement)){e.preventDefault();chatInput.focus()}});
 const photoBtn=$("#photoBtn");
 photoBtn.addEventListener("click",async()=>{
   const c=document.createElement("canvas");c.width=canvas.width;c.height=canvas.height;const g=c.getContext("2d");g.drawImage(canvas,0,0);
@@ -525,23 +572,51 @@ function makeP2PRoom(T,roomId){
   r.onPeerLeave=id=>{const p=map.get(id);if(!p)return;map.delete(id);rebuild();fire({left:[p]})};
   pres.onMessage=(data,{peerId})=>{if(!data||typeof data!=="object"||Array.isArray(data))return;let len=0;try{len=JSON.stringify(data).length}catch(e){return}if(len>4096)return;
     const isNew=!map.has(peerId);const p=mk(peerId,data);map.set(peerId,p);rebuild();fire(isNew?{joined:[p]}:{updated:[p]})};
-  setInterval(()=>{if(map.size)pres.send(mine)},20000);
-  return {raw:r,onJoin:f=>joinHooks.push(f),peers:()=>snap,
+  const iv=setInterval(()=>{if(map.size)pres.send(mine)},20000);
+  return {raw:r,leave(){clearInterval(iv);subs.length=0;joinHooks.length=0;try{r.leave()}catch(e){}},onJoin:f=>joinHooks.push(f),peers:()=>snap,
     presence(patch){const n={...mine};for(const k in patch){if(patch[k]===null||patch[k]===undefined)delete n[k];else n[k]=patch[k]}
       mine=n;self.presence=n;rebuild();clearTimeout(timer);timer=setTimeout(()=>pres.send(mine),60);return Promise.resolve()},
     onPeers(fn){subs.push(fn);setTimeout(()=>fn({peers:snap,joined:snap.slice(),left:[],updated:[]}),0);return()=>{}}};
 }
-const params=new URLSearchParams(location.search);
-let roomId=(params.get("room")||"").replace(/[^a-zA-Z0-9-]/g,"").slice(0,40);
-if(!roomId){roomId="fire-"+Math.random().toString(36).slice(2,8);params.set("room",roomId);history.replaceState(null,"",location.pathname+"?"+params.toString())}
-$("#inviteBtn").addEventListener("click",async()=>{const url=location.href;
-  try{await navigator.clipboard.writeText(url);toast("링크를 복사했어요. 친구한테 보내 주세요")}catch(e){window.prompt("이 링크를 친구한테 보내 주세요",url)}});
-(async()=>{
-  resize();requestAnimationFrame(frame);if(!me.name)openSit();updateWho();refreshMusicUI();loadTracks();
-  try{const T=await import("https://esm.sh/trystero@0.26.0");room=makeP2PRoom(T,roomId);room.onPeers(onPeers);
+/* ---------- 방 만들기 · 들어가기 · 퇴장 ---------- */
+const lobby=$("#lobby"),roomTitleEl=$("#roomTitle");
+let roomId="",roomName="",T=null,lastRoom=null;
+const cleanId=v=>String(v||"").replace(/[^a-zA-Z0-9-]/g,"").slice(0,40);
+function roomUrl(){const q=new URLSearchParams();q.set("room",roomId);if(roomName)q.set("name",roomName);return location.pathname+"?"+q.toString()}
+function showLobby(left){document.body.classList.add("in-lobby");lobby.hidden=false;sit.hidden=true;
+  $("#rejoin").hidden=!left;if(left)$("#rejoinText").textContent=`${left.name?"“"+left.name+"” ":""}불 앞에서 일어났어요.`}
+async function enterRoom(id,name){
+  roomId=cleanId(id);roomName=clean(name,20);if(!roomId)return;
+  history.replaceState(null,"",roomUrl());roomTitleEl.textContent=roomName;
+  document.body.classList.remove("in-lobby");lobby.hidden=true;solo=false;loadedAt=performance.now();
+  if(!me.name)openSit();updateWho();
+  try{if(!T)T=await import("https://esm.sh/trystero@0.26.0");
+    room=makeP2PRoom(T,roomId);room.onPeers(onPeers);
     musicAction=room.raw.makeAction("music");musicAction.onMessage=d=>{if(d&&Number.isFinite(d.anchor)&&Number.isFinite(d.at))setAnchor(d.anchor,d.at)};
     room.onJoin(id=>{if(anchorAt)musicAction.send({anchor,at:anchorAt},{target:id})});
     pushPresence();updateWho()}catch(e){console.error(e);goSolo()}
+}
+function leaveRoom(){
+  if(room){room.leave();room=null}
+  lastRoom={id:roomId,name:roomName};musicAction=null;
+  known.clear();bubbles.clear();flying.length=0;floats.length=0;myPeer=null;
+  if(me.roast!=null){me.roast=null;roastBtn.textContent="마시멜로 굽기"}
+  if(listening){listening=false;music.pause();curSrc="";refreshMusicUI()}
+  logEl.textContent="";roomTitleEl.textContent="";roomId="";roomName="";
+  $("#joinInput").value="";history.replaceState(null,"",location.pathname);showLobby(lastRoom);
+}
+$("#leaveBtn").addEventListener("click",leaveRoom);
+$("#rejoinBtn").addEventListener("click",()=>{if(lastRoom)enterRoom(lastRoom.id,lastRoom.name)});
+$("#createBtn").addEventListener("click",()=>{enterRoom("fire-"+Math.random().toString(36).slice(2,8),$("#roomNameInput").value)});
+$("#joinForm").addEventListener("submit",e=>{e.preventDefault();const v=$("#joinInput").value.trim();if(!v)return;
+  let id=v,name="";try{const u=new URL(v);id=u.searchParams.get("room")||"";name=u.searchParams.get("name")||""}catch(err){}
+  id=cleanId(id);if(!id){toast("방 코드를 다시 확인해 주세요");return}enterRoom(id,name)});
+$("#inviteBtn").addEventListener("click",async()=>{const url=location.origin+roomUrl();
+  try{await navigator.clipboard.writeText(url);toast("링크를 복사했어요. 친구한테 보내 주세요")}catch(e){window.prompt("이 링크를 친구한테 보내 주세요",url)}});
+(async()=>{
+  resize();requestAnimationFrame(frame);refreshMusicUI();loadTracks();
+  const params=new URLSearchParams(location.search);const id=cleanId(params.get("room"));
+  if(id)enterRoom(id,params.get("name")||"");else showLobby(null);
 })();
 })();
 </script>
