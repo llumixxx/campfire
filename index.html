@@ -157,6 +157,7 @@ body.in-lobby #menuBtn,body.in-lobby .top h1,body.in-lobby .dock,body.in-lobby .
 .ritem:hover{border-color:var(--focus)}
 .ritem .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:15px}
 .ritem .meta{font-size:12px;color:var(--ink-dim);white-space:nowrap}
+.rlist .more{width:100%;font-size:14px;padding:10px;margin-top:2px}
 .rempty{font-size:13px!important;color:var(--ink-dim);margin:6px 2px!important}
 .createForm{margin-top:12px}
 .createForm[hidden]{display:none}
@@ -498,7 +499,7 @@ function startSfx(){const AC=window.AudioContext||window.webkitAudioContext;if(!
     const src=a.createBufferSource();src.buffer=buf;src.loop=true;src.loopStart=1;src.loopEnd=Math.max(2,Math.min(52,buf.duration-1));
     src.connect(comp);src.start(0,1);o.ready=true}).catch(()=>toast("모닥불 소리를 불러오지 못했어요"));
   return o}
-function crackle(){if(sfx&&sfx.on&&sfx.ready){const t=sfx.a.currentTime;sfx.g.gain.cancelScheduledValues(t);sfx.g.gain.setTargetAtTime(9,t,.05);sfx.g.gain.setTargetAtTime(5,t+.6,.5)}}
+function crackle(){if(sfx&&sfx.on&&sfx.ready){const t=sfx.a.currentTime;sfx.g.gain.cancelScheduledValues(t);sfx.g.gain.setTargetAtTime(3.2,t,.08);sfx.g.gain.setTargetAtTime(2,t+.6,.6)}}
 $("#soundBtn").addEventListener("click",()=>{if(!sfx){sfx=startSfx();if(!sfx)return}else{sfx.on=!sfx.on;sfx.on?sfx.a.resume():sfx.a.suspend()}
   $("#soundBtn").textContent=sfx.on?"모닥불 소리 끄기":"모닥불 소리 켜기";$("#soundBtn").classList.toggle("on",sfx.on)});
 
@@ -550,7 +551,7 @@ function frame(t){
   drawBubbles(st,t);drawRoasts(st,now);drawFloats(st,t);drawFireworks(t,dt);drawSnow(t,dt);
   const star=starAt(now);const show=!!star&&me.name&&(!me.wish||me.wish.s!==star.sl);
   if(wishBtn.hidden===show)wishBtn.hidden=!show;
-  if(sfx&&sfx.on&&sfx.ready&&t-lastGain>1500){sfx.g.gain.setTargetAtTime(3+3*clamp(I,0,1.2),sfx.a.currentTime,.8);lastGain=t}
+  if(sfx&&sfx.on&&sfx.ready&&t-lastGain>1500){sfx.g.gain.setTargetAtTime(1.4+1.2*clamp(I,0,1.2),sfx.a.currentTime,.8);lastGain=t}
   requestAnimationFrame(frame)}
 
 /* ---------- UI ---------- */
@@ -628,7 +629,7 @@ function drawSnow(t,dt){const now=Date.now();
     ctx.beginPath();ctx.arc(f.x,f.y,f.r,0,6.283);ctx.fill()}}
 let qTimer=null;
 function showCard(i,by){if(!(i>=0&&i<QUESTIONS.length))return;$("#qwho").textContent=`💬 ${by}님이 꺼낸 이야기`;$("#qtext").textContent=QUESTIONS[i];
-  $("#qcard").hidden=false;clearTimeout(qTimer);qTimer=setTimeout(()=>$("#qcard").hidden=true,30000)}
+  $("#qcard").hidden=false;clearTimeout(qTimer);qTimer=setTimeout(()=>$("#qcard").hidden=true,20000)}
 $("#qclose").addEventListener("click",()=>{$("#qcard").hidden=true});
 let bannerTimer=null;
 function showPick(name,by){const el=$("#banner");const names=people().map(p=>p.name);if(!names.length)names.push(name);
@@ -687,20 +688,19 @@ function onPeers(ch){const t=performance.now();const early=t-loadedAt<3000;
     const sayAt=pr.say&&Number.isFinite(pr.say.at)?pr.say.at:0,emoAt=pr.emo&&Number.isFinite(pr.emo.at)?pr.emo.at:0,
       dustAt=pr.dust&&Number.isFinite(pr.dust.at)?pr.dust.at:0,wishAt=pr.wish&&Number.isFinite(pr.wish.at)?pr.wish.at:0;
     const at=o=>o&&typeof o==="object"&&Number.isFinite(o.at)?o.at:0;const fwAt=at(pr.fw),cardAt=at(pr.card),pickAt=at(pr.pick),snowAt=at(pr.snow);
-    const prev=known.get(p.peer);
-    if(prev&&name){
-      if(lastLog&&lastLog!==prev.lastLog)flying.push({id:p.peer,t0:t});
+    const prev=known.get(p.peer);const fresh=v=>v&&Math.abs(Date.now()-v)<15000;
+    if(prev&&prev.name&&name){
+      if(lastLog&&lastLog!==prev.lastLog&&fresh(lastLog))flying.push({id:p.peer,t0:t});
       if(prev.roast!=null&&roast==null)floats.push({id:p.peer,text:"냠",t0:t});
-      if(sayAt&&sayAt!==prev.sayAt){const text=clean(pr.say.t,80);if(text){bubbles.set(p.peer,{text,t0:t});addLine(name,hue,text)}}
-      if(emoAt&&emoAt!==prev.emoAt&&EMOS.includes(pr.emo.e))floats.push({id:p.peer,text:pr.emo.e,emoji:true,t0:t,dx:(Math.random()-.5)*30,ph:Math.random()*6});
-      if(dustAt&&dustAt!==prev.dustAt){const d=DUST.find(x=>x.h===pr.dust.h);if(d){flying.push({id:p.peer,t0:t,dust:d.h});addLine("",0,`${name}님이 ${d.n} 마법 가루를 뿌렸어요`,true)}}
-      if(wishAt&&wishAt!==prev.wishAt){floats.push({id:p.peer,text:"🌠 소원 빌었어요",t0:t});addLine("",0,`${name}님이 별똥별에 소원을 빌었어요`,true)}
-      if(fwAt&&fwAt!==prev.fwAt&&Number.isFinite(pr.fw.x)&&Number.isFinite(pr.fw.h))launchFirework(clamp(pr.fw.x,0,1),pr.fw.h%360);
-      if(cardAt&&cardAt!==prev.cardAt&&Number.isInteger(pr.card.i)){showCard(pr.card.i,name);addLine("",0,`${name}님이 이야기 카드를 꺼냈어요`,true)}
-      if(pickAt&&pickAt!==prev.pickAt){const pn=clean(pr.pick.name);if(pn)showPick(pn,name)}
-      if(snowAt&&snowAt!==prev.snowAt&&Date.now()-snowAt<40000){snowUntil=Math.max(snowUntil,Date.now()+40000);addLine("",0,`${name}님이 눈을 내렸어요`,true)}
-      if(!prev.name&&!early){toast(`${name}님이 불 앞에 앉았어요`);addLine("",0,`${name}님이 불 앞에 앉았어요`,true)}
-    }else if(!prev&&name&&!early){toast(`${name}님이 불 앞에 앉았어요`);addLine("",0,`${name}님이 불 앞에 앉았어요`,true)}
+      if(sayAt&&sayAt!==prev.sayAt&&fresh(sayAt)){const text=clean(pr.say.t,80);if(text){bubbles.set(p.peer,{text,t0:t});addLine(name,hue,text)}}
+      if(emoAt&&emoAt!==prev.emoAt&&fresh(emoAt)&&EMOS.includes(pr.emo.e))floats.push({id:p.peer,text:pr.emo.e,emoji:true,t0:t,dx:(Math.random()-.5)*30,ph:Math.random()*6});
+      if(dustAt&&dustAt!==prev.dustAt&&fresh(dustAt)){const d=DUST.find(x=>x.h===pr.dust.h);if(d){flying.push({id:p.peer,t0:t,dust:d.h});addLine("",0,`${name}님이 ${d.n} 마법 가루를 뿌렸어요`,true)}}
+      if(wishAt&&wishAt!==prev.wishAt&&fresh(wishAt)){floats.push({id:p.peer,text:"🌠 소원 빌었어요",t0:t});addLine("",0,`${name}님이 별똥별에 소원을 빌었어요`,true)}
+      if(fwAt&&fwAt!==prev.fwAt&&fresh(fwAt)&&Number.isFinite(pr.fw.x)&&Number.isFinite(pr.fw.h))launchFirework(clamp(pr.fw.x,0,1),pr.fw.h%360);
+      if(cardAt&&cardAt!==prev.cardAt&&fresh(cardAt)&&Number.isInteger(pr.card.i)){showCard(pr.card.i,name);addLine("",0,`${name}님이 이야기 카드를 꺼냈어요`,true)}
+      if(pickAt&&pickAt!==prev.pickAt&&fresh(pickAt)){const pn=clean(pr.pick.name);if(pn)showPick(pn,name)}
+      if(snowAt&&snowAt!==prev.snowAt&&fresh(snowAt)){snowUntil=Math.max(snowUntil,Date.now()+40000);addLine("",0,`${name}님이 눈을 내렸어요`,true)}
+    }else if(name&&(!prev||!prev.name)&&!early){toast(`${name}님이 불 앞에 앉았어요`);addLine("",0,`${name}님이 불 앞에 앉았어요`,true)}
     known.set(p.peer,{lastLog,roast,name,sayAt,emoAt,dustAt,wishAt,fwAt,cardAt,pickAt,snowAt})}
   for(const p of ch.left){const k=known.get(p.peer);if(k&&k.name){toast(`${k.name}님이 자리를 떴어요`);addLine("",0,`${k.name}님이 자리를 떴어요`,true)}known.delete(p.peer);bubbles.delete(p.peer)}
   updateWho()}
@@ -745,16 +745,19 @@ async function initLobby(){try{await ensureT();lobbyRoom=T.joinRoom({appId:"catc
   lobbyRoom.onPeerJoin=id=>announce(id);
   lobbyRoom.onPeerLeave=id=>{for(const [k,e] of ads)if(e.peer===id)ads.delete(k);renderRooms()};
   setInterval(()=>announce(),8000);setInterval(renderRooms,5000);announce()}catch(e){console.error(e)}}
+const PAGE=8;let shown=PAGE;
 function renderRooms(){if(lobby.hidden)return;const now=Date.now();for(const [k,e] of ads)if(now-e.seen>25000)ads.delete(k);
   const q=$("#roomSearch").value.trim().toLowerCase();const list=[...ads.values()].filter(e=>!q||e.name.toLowerCase().includes(q)||e.id.toLowerCase().includes(q)).sort((a,b)=>b.n-a.n);
   const box=$("#rlist");box.textContent="";$("#roomCount").textContent=ads.size?`${ads.size}개`:"";
   if(!list.length){const p=document.createElement("p");p.className="rempty";
     p.textContent=q?"찾는 방이 없어요.":now-lobbyStart<5000?"방을 찾는 중이에요…":"지금 열린 방이 없어요. 새 방을 만들어 보세요.";box.appendChild(p);return}
-  for(const e of list.slice(0,50)){const b=document.createElement("button");b.type="button";b.className="ritem";
+  for(const e of list.slice(0,shown)){const b=document.createElement("button");b.type="button";b.className="ritem";
     const nm=document.createElement("span");nm.className="nm";nm.textContent=(e.lock?"🔒 ":"🔥 ")+(e.name||"이름 없는 방");
     const meta=document.createElement("span");meta.className="meta";meta.textContent=`${e.n}명`;
-    b.append(nm,meta);b.addEventListener("click",()=>enterRoom(e.id,e.name,{lock:e.lock}));box.appendChild(b)}}
-$("#roomSearch").addEventListener("input",renderRooms);
+    b.append(nm,meta);b.addEventListener("click",()=>enterRoom(e.id,e.name,{lock:e.lock}));box.appendChild(b)}
+  if(list.length>shown){const m=document.createElement("button");m.type="button";m.className="btn more";m.textContent=`더 보기 (${list.length-shown}개 더)`;
+    m.addEventListener("click",()=>{shown+=PAGE;renderRooms()});box.appendChild(m)}}
+$("#roomSearch").addEventListener("input",()=>{shown=PAGE;renderRooms()});
 
 function askPw(id,name,opts){pending={id,name,opts};$("#pwText").textContent=`${name?"“"+name+"” ":"이 "}방은 비밀번호가 있어요.`;
   $("#pwInput").value="";pwBox.hidden=false;lobby.hidden=true;setTimeout(()=>$("#pwInput").focus(),50)}
