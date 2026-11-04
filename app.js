@@ -507,52 +507,64 @@ function onPeers(ch){const t=performance.now();const early=t-loadedAt<3000;
   updateWho()}
 function goSolo(){room=null;solo=true;updateWho()}
 
-/* ---------- P2P 연결 (서버 없이 브라우저끼리) ---------- */
-function makeP2PRoom(T,roomId,pw,turn){
-  const r=T.joinRoom(baseCfg(turn,pw),roomId,{onJoinError:d=>{joinFails++;const msg=String(d&&d.error||"");
-    if(pw&&/password|decrypt/i.test(msg)){toast("비밀번호가 틀린 것 같아요. 다시 확인해 주세요");return}
-    if(!failWarned){failWarned=true;toast("네트워크 때문에 일부 사람과 연결이 안 됐어요. 새로고침하면 다시 시도해요")}}});
-  const pres=r.makeAction("pres");const map=new Map();const subs=[],joinHooks=[];let mine={},timer=null,snap;
-  const self={peer:T.selfId,by:null,isMe:true,sameTab:true,kind:"viewer",guest:false,presence:mine,updatedAt:Date.now()};
-  const rebuild=()=>{snap=Object.freeze([self,...map.values()])};rebuild();
-  const fire=ch=>{const c={peers:snap,joined:ch.joined||[],left:ch.left||[],updated:ch.updated||[]};subs.forEach(f=>{try{f(c)}catch(e){console.error(e)}})};
-  const mk=(id,presence)=>({peer:id,by:null,isMe:false,sameTab:false,kind:"viewer",guest:false,presence,updatedAt:Date.now()});
-  r.onPeerJoin=id=>{if(!map.has(id)){const p=mk(id,{});map.set(id,p);rebuild();fire({joined:[p]})}pres.send(mine,{target:id});joinHooks.forEach(f=>f(id))};
-  r.onPeerLeave=id=>{const p=map.get(id);if(!p)return;map.delete(id);rebuild();fire({left:[p]})};
-  pres.onMessage=(data,{peerId})=>{if(!data||typeof data!=="object"||Array.isArray(data))return;let len=0;try{len=JSON.stringify(data).length}catch(e){return}if(len>4096)return;
-    const isNew=!map.has(peerId);const p=mk(peerId,data);map.set(peerId,p);rebuild();fire(isNew?{joined:[p]}:{updated:[p]})};
-  const iv=setInterval(()=>{if(map.size)pres.send(mine)},8000);
-  return {raw:r,leave(){clearInterval(iv);subs.length=0;joinHooks.length=0;try{r.leave()}catch(e){}},onJoin:f=>joinHooks.push(f),peers:()=>snap,
+/* ---------- 실시간 연결 (Firebase Realtime Database 중계) ---------- */
+const FB_CFG={apiKey:"AIzaSyAs3aqh2N75_c24xdjDNf271L16-VYCmls",authDomain:"lomxx-calculator.firebaseapp.com",
+  databaseURL:"https://lomxx-calculator-default-rtdb.asia-southeast1.firebasedatabase.app",projectId:"lomxx-calculator"};
+let fdb=null;try{fdb=firebase.initializeApp(FB_CFG,"campfire").database()}catch(e){console.error(e)}
+const ROOT="campfire";const MY_ID="u"+Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4);
+const STALE=90000;
+let fbOnline=true;
+function makeRoom(roomKey){
+  const base=fdb.ref(`${ROOT}/rooms/${roomKey}`),pref=base.child("p"),myRef=pref.child(MY_ID);
+  const map=new Map();const subs=[];let mine={},timer=null,snap,live=true;
+  const self={peer:MY_ID,isMe:true,sameTab:true,kind:"viewer",presence:mine};
+  const rebuild=()=>{const now=Date.now();snap=Object.freeze([self,...[...map.values()].filter(p=>now-(p.presence.ts||0)<STALE)])};rebuild();
+  const fire=ch=>{rebuild();const c={peers:snap,joined:ch.joined||[],left:ch.left||[],updated:ch.updated||[]};subs.forEach(f=>{try{f(c)}catch(e){console.error(e)}})};
+  const mk=(id,v)=>({peer:id,isMe:false,sameTab:false,kind:"viewer",presence:(v&&typeof v==="object"&&!Array.isArray(v))?v:{}});
+  const ok=v=>{try{return JSON.stringify(v).length<=4096}catch(e){return false}};
+  const onAdd=sn=>{if(sn.key===MY_ID||!ok(sn.val()))return;const p=mk(sn.key,sn.val());map.set(sn.key,p);fire({joined:[p]})};
+  const onChg=sn=>{if(sn.key===MY_ID||!ok(sn.val()))return;const isNew=!map.has(sn.key);const p=mk(sn.key,sn.val());map.set(sn.key,p);fire(isNew?{joined:[p]}:{updated:[p]})};
+  const onRem=sn=>{const p=map.get(sn.key);if(!p)return;map.delete(sn.key);fire({left:[p]})};
+  pref.on("child_added",onAdd);pref.on("child_changed",onChg);pref.on("child_removed",onRem);
+  const write=()=>{if(!live)return;mine={...mine,ts:Date.now()};self.presence=mine;myRef.onDisconnect().remove();myRef.set(mine).catch(()=>{})};
+  const iv=setInterval(()=>{if(Object.keys(mine).length)write();
+    const now=Date.now();for(const [k,p] of map)if(now-(p.presence.ts||0)>STALE){map.delete(k);fire({left:[p]})}},30000);
+  const actions=[];
+  return {raw:{makeAction(name){const r=base.child("a_"+name);let cb=null;const h=sn=>{const v=sn.val();if(v&&cb)cb(v,{peerId:""})};r.on("value",h);actions.push([r,h]);
+      return {send(d){r.set(d).catch(()=>{})},set onMessage(f){cb=f}}}},
+    rewrite:write,
+    leave(){live=false;clearInterval(iv);subs.length=0;pref.off("child_added",onAdd);pref.off("child_changed",onChg);pref.off("child_removed",onRem);
+      actions.forEach(([r,h])=>r.off("value",h));myRef.onDisconnect().cancel();myRef.remove().catch(()=>{})},
+    onJoin(){},peers:()=>{rebuild();return snap},
     presence(patch){const n={...mine};for(const k in patch){if(patch[k]===null||patch[k]===undefined)delete n[k];else n[k]=patch[k]}
-      mine=n;self.presence=n;rebuild();clearTimeout(timer);timer=setTimeout(()=>pres.send(mine),60);return Promise.resolve()},
+      mine=n;self.presence=n;clearTimeout(timer);timer=setTimeout(write,60);return Promise.resolve()},
     onPeers(fn){subs.push(fn);setTimeout(()=>fn({peers:snap,joined:snap.slice(),left:[],updated:[]}),0);return()=>{}}};
 }
+async function roomKeyOf(id,pw){if(!pw)return id;const buf=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(id+"|"+pw));
+  return "k"+[...new Uint8Array(buf)].slice(0,16).map(b=>b.toString(16).padStart(2,"0")).join("")}
 /* ---------- 방 목록 · 만들기 · 들어가기 · 비밀번호 · 퇴장 ---------- */
 const lobby=$("#lobby"),roomTitleEl=$("#roomTitle"),pwBox=$("#pwBox");
-let roomId="",roomName="",roomPw="",roomHidden=false,T=null,lastRoom=null,pending=null;
+let roomId="",roomName="",roomPw="",roomHidden=false,lastRoom=null,pending=null;
 const cleanId=v=>String(v||"").replace(/[^a-zA-Z0-9-]/g,"").slice(0,40);
-async function ensureT(){if(!T)T=await import("https://esm.sh/trystero@0.26.0");return T}
-/* 직접 연결이 안 되는 네트워크(통신사 LTE·회사 와이파이 등)를 위한 TURN 중계 서버 */
-let turnP=null;
-function getTurn(){if(!turnP)turnP=Promise.race([fetch("/api/turn").then(r=>r.ok?r.json():{iceServers:[]}).then(j=>Array.isArray(j.iceServers)?j.iceServers:[]).catch(()=>[]),new Promise(r=>setTimeout(()=>r([]),3500))]);return turnP}
-let joinFails=0,failWarned=false;
-function baseCfg(turn,pw){const c={appId:"catchmilli-campfire-v1"};if(turn&&turn.length)c.turnConfig=turn;if(pw)c.password=pw;return c}
 function roomUrl(){const q=new URLSearchParams();q.set("room",roomId);if(roomName)q.set("name",roomName);if(roomPw)q.set("lock","1");if(roomHidden)q.set("hidden","1");return location.pathname+"?"+q.toString()}
 function showLobby(left){document.body.classList.add("in-lobby");lobby.hidden=false;sit.hidden=true;pwBox.hidden=true;setMenu(false);
   $("#rejoin").hidden=!left;if(left)$("#rejoinText").textContent=`${left.name?"“"+left.name+"” ":""}불 앞에서 일어났어요.`;renderRooms()}
 
-/* 방 목록: 방에 있는 사람들이 'lobby' 채널에 방 정보를 알려줌 */
-let lobbyRoom=null,adAction=null;const ads=new Map();const lobbyStart=Date.now();
-function announce(target){if(!adAction||!room||!roomId||roomHidden)return;
-  const d={id:roomId,name:roomName,n:people().length,lock:!!roomPw,at:Date.now()};try{adAction.send(d,target?{target}:undefined)}catch(e){}}
-function unannounce(id){if(adAction&&id)try{adAction.send({id,gone:true,at:Date.now()})}catch(e){}}
-async function initLobby(){try{await ensureT();const turn=await getTurn();lobbyRoom=T.joinRoom(baseCfg(turn),"lobby-v1");adAction=lobbyRoom.makeAction("ad");
-  adAction.onMessage=(d,{peerId})=>{if(!d||typeof d!=="object")return;const id=cleanId(d.id);if(!id)return;
-    if(d.gone){const e=ads.get(id);if(e&&e.peer===peerId)ads.delete(id);renderRooms();return}
-    const n=Number.isFinite(d.n)?clamp(Math.round(d.n),1,99):1;ads.set(id,{id,name:clean(d.name,20),n,lock:d.lock===true,seen:Date.now(),peer:peerId});renderRooms()};
-  lobbyRoom.onPeerJoin=id=>announce(id);
-  lobbyRoom.onPeerLeave=id=>{for(const [k,e] of ads)if(e.peer===id)ads.delete(k);renderRooms()};
-  setInterval(()=>announce(),8000);setInterval(renderRooms,5000);announce()}catch(e){console.error(e)}}
+/* 방 목록: 각 방에 있는 사람이 lobby/{방코드}/{내ID} 에 표시를 남기고, 나가면 자동으로 지워짐 */
+const ads=new Map();const lobbyStart=Date.now();let lobbyRef=null;
+function announce(){if(!fdb||!room||!roomId||roomHidden)return;lobbyRef=fdb.ref(`${ROOT}/lobby/${roomId}/${MY_ID}`);
+  lobbyRef.onDisconnect().remove();lobbyRef.set({name:roomName,lock:!!roomPw,ts:Date.now()}).catch(()=>{})}
+function unannounce(){if(lobbyRef){lobbyRef.onDisconnect().cancel();lobbyRef.remove().catch(()=>{});lobbyRef=null}}
+setInterval(()=>{if(lobbyRef)announce()},30000);
+function initLobby(){if(!fdb)return;
+  fdb.ref(`${ROOT}/lobby`).on("value",sn=>{ads.clear();const now=Date.now();
+    sn.forEach(r=>{const id=cleanId(r.key);if(!id)return;let n=0,name="",lock=false;
+      r.forEach(u=>{const v=u.val()||{};if(now-(v.ts||0)>STALE)return;n++;if(!name&&typeof v.name==="string")name=clean(v.name,20);if(v.lock===true)lock=true});
+      if(n)ads.set(id,{id,name,n:Math.min(n,99),lock,seen:Infinity})});renderRooms()});
+  fdb.ref(".info/connected").on("value",sn=>{const on=sn.val()===true;
+    if(on&&!fbOnline){if(room)room.rewrite();if(lobbyRef)announce()}fbOnline=on;
+    if(!on&&room)setTimeout(()=>{if(!fbOnline)toast("연결이 잠깐 끊겼어요. 다시 연결하는 중…")},4000)});
+  setInterval(renderRooms,10000)}
 const PAGE=8;let shown=PAGE;
 function renderRooms(){if(lobby.hidden)return;const now=Date.now();for(const [k,e] of ads)if(now-e.seen>25000)ads.delete(k);
   const q=$("#roomSearch").value.trim().toLowerCase();const list=[...ads.values()].filter(e=>!q||e.name.toLowerCase().includes(q)||e.id.toLowerCase().includes(q)).sort((a,b)=>b.n-a.n);
@@ -581,16 +593,15 @@ async function enterRoom(id,name,opts={}){
   history.replaceState(null,"",roomUrl());roomTitleEl.textContent=(roomPw?"🔒 ":"")+roomName;
   document.body.classList.remove("in-lobby");lobby.hidden=true;pwBox.hidden=true;solo=false;loadedAt=performance.now();enteredAt=Date.now();
   if(!me.name)openSit();updateWho();
-  try{await ensureT();const turn=await getTurn();failWarned=false;
-    room=makeP2PRoom(T,roomId,roomPw,turn);room.onPeers(onPeers);
+  try{if(!fdb)throw new Error("no firebase");const key=await roomKeyOf(roomId,roomPw);
+    room=makeRoom(key);room.onPeers(onPeers);
     musicAction=room.raw.makeAction("music");musicAction.onMessage=d=>{if(d&&Number.isFinite(d.anchor)&&Number.isFinite(d.at))setAnchor(d.anchor,d.at)};
-    room.onJoin(id=>{if(anchorAt)musicAction.send({anchor,at:anchorAt},{target:id})});
     pushPresence();updateWho();announce();
-    clearTimeout(pwCheck);if(roomPw)pwCheck=setTimeout(()=>{const e=ads.get(roomId);if(room&&e&&e.n>=1&&people().length<=1)toast("아무도 안 보이면 비밀번호를 다시 확인해 주세요")},15000);
+    clearTimeout(pwCheck);if(roomPw)pwCheck=setTimeout(()=>{const e=ads.get(roomId);if(room&&e&&e.n>=1&&people().length<=1)toast("비밀번호가 틀린 것 같아요. 다시 확인해 주세요")},7000);
   }catch(e){console.error(e);goSolo()}
 }
 function leaveRoom(){
-  clearTimeout(pwCheck);unannounce(roomId);
+  clearTimeout(pwCheck);unannounce();
   if(room){room.leave();room=null}
   lastRoom={id:roomId,name:roomName,lock:!!roomPw,hidden:roomHidden};musicAction=null;
   known.clear();bubbles.clear();flying.length=0;floats.length=0;gifts.length=0;myPeer=null;snowUntil=0;$("#qcard").hidden=true;
