@@ -508,8 +508,10 @@ function onPeers(ch){const t=performance.now();const early=t-loadedAt<3000;
 function goSolo(){room=null;solo=true;updateWho()}
 
 /* ---------- P2P 연결 (서버 없이 브라우저끼리) ---------- */
-function makeP2PRoom(T,roomId,pw){
-  const cfg={appId:"catchmilli-campfire-v1"};if(pw)cfg.password=pw;const r=T.joinRoom(cfg,roomId);
+function makeP2PRoom(T,roomId,pw,turn){
+  const r=T.joinRoom(baseCfg(turn,pw),roomId,{onJoinError:d=>{joinFails++;const msg=String(d&&d.error||"");
+    if(pw&&/password|decrypt/i.test(msg)){toast("비밀번호가 틀린 것 같아요. 다시 확인해 주세요");return}
+    if(!failWarned){failWarned=true;toast("네트워크 때문에 일부 사람과 연결이 안 됐어요. 새로고침하면 다시 시도해요")}}});
   const pres=r.makeAction("pres");const map=new Map();const subs=[],joinHooks=[];let mine={},timer=null,snap;
   const self={peer:T.selfId,by:null,isMe:true,sameTab:true,kind:"viewer",guest:false,presence:mine,updatedAt:Date.now()};
   const rebuild=()=>{snap=Object.freeze([self,...map.values()])};rebuild();
@@ -519,7 +521,7 @@ function makeP2PRoom(T,roomId,pw){
   r.onPeerLeave=id=>{const p=map.get(id);if(!p)return;map.delete(id);rebuild();fire({left:[p]})};
   pres.onMessage=(data,{peerId})=>{if(!data||typeof data!=="object"||Array.isArray(data))return;let len=0;try{len=JSON.stringify(data).length}catch(e){return}if(len>4096)return;
     const isNew=!map.has(peerId);const p=mk(peerId,data);map.set(peerId,p);rebuild();fire(isNew?{joined:[p]}:{updated:[p]})};
-  const iv=setInterval(()=>{if(map.size)pres.send(mine)},20000);
+  const iv=setInterval(()=>{if(map.size)pres.send(mine)},8000);
   return {raw:r,leave(){clearInterval(iv);subs.length=0;joinHooks.length=0;try{r.leave()}catch(e){}},onJoin:f=>joinHooks.push(f),peers:()=>snap,
     presence(patch){const n={...mine};for(const k in patch){if(patch[k]===null||patch[k]===undefined)delete n[k];else n[k]=patch[k]}
       mine=n;self.presence=n;rebuild();clearTimeout(timer);timer=setTimeout(()=>pres.send(mine),60);return Promise.resolve()},
@@ -530,6 +532,11 @@ const lobby=$("#lobby"),roomTitleEl=$("#roomTitle"),pwBox=$("#pwBox");
 let roomId="",roomName="",roomPw="",roomHidden=false,T=null,lastRoom=null,pending=null;
 const cleanId=v=>String(v||"").replace(/[^a-zA-Z0-9-]/g,"").slice(0,40);
 async function ensureT(){if(!T)T=await import("https://esm.sh/trystero@0.26.0");return T}
+/* 직접 연결이 안 되는 네트워크(통신사 LTE·회사 와이파이 등)를 위한 TURN 중계 서버 */
+let turnP=null;
+function getTurn(){if(!turnP)turnP=Promise.race([fetch("/api/turn").then(r=>r.ok?r.json():{iceServers:[]}).then(j=>Array.isArray(j.iceServers)?j.iceServers:[]).catch(()=>[]),new Promise(r=>setTimeout(()=>r([]),3500))]);return turnP}
+let joinFails=0,failWarned=false;
+function baseCfg(turn,pw){const c={appId:"catchmilli-campfire-v1"};if(turn&&turn.length)c.turnConfig=turn;if(pw)c.password=pw;return c}
 function roomUrl(){const q=new URLSearchParams();q.set("room",roomId);if(roomName)q.set("name",roomName);if(roomPw)q.set("lock","1");if(roomHidden)q.set("hidden","1");return location.pathname+"?"+q.toString()}
 function showLobby(left){document.body.classList.add("in-lobby");lobby.hidden=false;sit.hidden=true;pwBox.hidden=true;setMenu(false);
   $("#rejoin").hidden=!left;if(left)$("#rejoinText").textContent=`${left.name?"“"+left.name+"” ":""}불 앞에서 일어났어요.`;renderRooms()}
@@ -539,7 +546,7 @@ let lobbyRoom=null,adAction=null;const ads=new Map();const lobbyStart=Date.now()
 function announce(target){if(!adAction||!room||!roomId||roomHidden)return;
   const d={id:roomId,name:roomName,n:people().length,lock:!!roomPw,at:Date.now()};try{adAction.send(d,target?{target}:undefined)}catch(e){}}
 function unannounce(id){if(adAction&&id)try{adAction.send({id,gone:true,at:Date.now()})}catch(e){}}
-async function initLobby(){try{await ensureT();lobbyRoom=T.joinRoom({appId:"catchmilli-campfire-v1"},"lobby-v1");adAction=lobbyRoom.makeAction("ad");
+async function initLobby(){try{await ensureT();const turn=await getTurn();lobbyRoom=T.joinRoom(baseCfg(turn),"lobby-v1");adAction=lobbyRoom.makeAction("ad");
   adAction.onMessage=(d,{peerId})=>{if(!d||typeof d!=="object")return;const id=cleanId(d.id);if(!id)return;
     if(d.gone){const e=ads.get(id);if(e&&e.peer===peerId)ads.delete(id);renderRooms();return}
     const n=Number.isFinite(d.n)?clamp(Math.round(d.n),1,99):1;ads.set(id,{id,name:clean(d.name,20),n,lock:d.lock===true,seen:Date.now(),peer:peerId});renderRooms()};
@@ -574,8 +581,8 @@ async function enterRoom(id,name,opts={}){
   history.replaceState(null,"",roomUrl());roomTitleEl.textContent=(roomPw?"🔒 ":"")+roomName;
   document.body.classList.remove("in-lobby");lobby.hidden=true;pwBox.hidden=true;solo=false;loadedAt=performance.now();enteredAt=Date.now();
   if(!me.name)openSit();updateWho();
-  try{await ensureT();
-    room=makeP2PRoom(T,roomId,roomPw);room.onPeers(onPeers);
+  try{await ensureT();const turn=await getTurn();failWarned=false;
+    room=makeP2PRoom(T,roomId,roomPw,turn);room.onPeers(onPeers);
     musicAction=room.raw.makeAction("music");musicAction.onMessage=d=>{if(d&&Number.isFinite(d.anchor)&&Number.isFinite(d.at))setAnchor(d.anchor,d.at)};
     room.onJoin(id=>{if(anchorAt)musicAction.send({anchor,at:anchorAt},{target:id})});
     pushPresence();updateWho();announce();
@@ -616,4 +623,3 @@ $("#inviteBtn").addEventListener("click",async()=>{const url=location.origin+roo
   if(id)enterRoom(id,params.get("name")||"",{lock:params.get("lock")==="1",hidden:params.get("hidden")==="1"});else showLobby(null);
 })();
 })();
-
