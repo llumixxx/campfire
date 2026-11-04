@@ -12,16 +12,19 @@ const hex=h=>{h=h.trim().replace("#","");return [parseInt(h.slice(0,2),16),parse
 function hsl2rgb(h,s,l){s/=100;l/=100;const k=n=>(n+h/30)%12,a=s*Math.min(l,1-l),f=n=>l-a*Math.max(-1,Math.min(k(n)-3,Math.min(9-k(n),1)));return [Math.round(255*f(0)),Math.round(255*f(8)),Math.round(255*f(4))]}
 const rnd=seed=>{const x=Math.sin(seed*12.9898+78.233)*43758.5453;return x-Math.floor(x)};
 
+const XMAS=true; /* 크리스마스 테마: false로 바꾸면 평소 모닥불 */
 const HUES=[18,42,140,190,262,330];
 const DUST=[{h:130,n:"초록"},{h:200,n:"파랑"},{h:275,n:"보라"},{h:320,n:"분홍"}];
-const EMOS=["👏","😂","🔥","❤️","🍻","🙏","😴","👻","🎉"];
+const EMOS=["👏","😂","🔥","❤️","🍻","🙏","😴","👻","🎉","🎄","🎅","⛄"];
 const FOODS={m:{e:"🍡",n:"마시멜로",t:[14,34,52],c:[[247,242,232],[232,170,80],[122,68,32],[40,28,22]],v:["아직 하얘요","노릇노릇, 완벽해요","살짝 탔지만 맛있어요","숯이 됐어요"]},
   s:{e:"🌭",n:"소시지",t:[10,28,48],c:[[228,150,150],[200,92,62],[122,52,32],[45,25,20]],v:["아직 덜 익었어요","톡 터지는 육즙!","겉바속촉 완성","탄 소시지…"]},
   g:{e:"🍠",n:"고구마",t:[25,55,85],c:[[160,78,98],[125,58,62],[82,42,36],[35,25,22]],v:["아직 딱딱해요","호호, 잘 익었어요","꿀이 흘러요","겉은 숯, 속은 꿀"]},
-  c:{e:"🌽",n:"옥수수",t:[10,28,48],c:[[250,222,96],[240,190,62],[172,112,42],[60,40,25]],v:["아직 생옥수수","톡톡 맛있어요","고소하게 잘 익었어요","새까매졌어요"]}};
+  c:{e:"🌽",n:"옥수수",t:[10,28,48],c:[[250,222,96],[240,190,62],[172,112,42],[60,40,25]],v:["아직 생옥수수","톡톡 맛있어요","고소하게 잘 익었어요","새까매졌어요"]},
+  b:{e:"🌰",n:"군밤",t:[12,30,50],c:[[132,78,44],[104,56,30],[66,36,20],[26,18,12]],v:["아직 덜 익었어요","껍질이 톡 벌어졌어요","달달하게 잘 익었어요","새까맣게 탔어요"]}};
+const GIFTS=["🧣 목도리","🧤 장갑","🍪 쿠키","☕ 핫초코","🧦 양말","🎀 리본","⭐ 별 장식","🦌 루돌프 인형","🍰 케이크","💌 손편지"];
 const foodOf=k=>FOODS[k]?k:"m";
 function verdict(k,sec){const f=FOODS[foodOf(k)];return sec<f.t[0]?f.v[0]:sec<f.t[1]?f.v[1]:sec<f.t[2]?f.v[2]:f.v[3]}
-const me={name:clean(store.get("fire.name")),hue:+store.get("fire.hue"),logs:[],roast:null,rk:"m",burn:null,dice:null,say:null,emo:null,dust:null,wish:null,typing:false,away:false,fw:null,card:null,pick:null,snow:null};
+const me={name:clean(store.get("fire.name")),hue:+store.get("fire.hue"),logs:[],roast:null,rk:"m",burn:null,dice:null,say:null,emo:null,dust:null,wish:null,typing:false,away:false,fw:null,card:null,pick:null,snow:null,gift:null};
 if(!HUES.includes(me.hue)){me.hue=HUES[Math.floor(Math.random()*HUES.length)];store.set("fire.hue",me.hue)}
 
 let room=null,myPeer=null,loadedAt=performance.now();
@@ -43,9 +46,11 @@ function resize(){
   stars=[];const n=Math.round(W*H/5200);
   for(let i=0;i<n;i++)stars.push({x:Math.random()*W,y:Math.random()*HY()*.95,r:Math.random()*1.3+.3,ph:Math.random()*6.28,sp:.6+Math.random()*1.6});
   treesFar=makeTrees(28,70);treesNear=makeTrees(40,105);
+  bulbs=[];treesNear.forEach((tr,i)=>{if(i%3)return;for(let k=0;k<5;k++){const u=(k+1)/6;bulbs.push({x:tr.x+(k%2?1:-1)*tr.w*.18*(1-u*.6),y:-(tr.h*.55*u)+(-tr.h*.12),tx:tr.x,c:k%4,ph:Math.random()*6.28})}});
   flies=[];for(let i=0;i<(W<640?7:14);i++)flies.push({x:Math.random()*W,y:HY()+Math.random()*H*.22,ph:Math.random()*6.28,sp:.3+Math.random()*.5,r:Math.random()*.5+.5});
 }
-let flies=[];
+let flies=[],bulbs=[];
+const BULB=["255,90,80","255,210,90","120,220,140","120,180,255"];
 function drawFlies(t){ctx.save();ctx.globalCompositeOperation="lighter";
   for(const f of flies){const tt=t/1000*f.sp+f.ph;const x=f.x+Math.sin(tt*1.3)*30,y=f.y+Math.cos(tt)*14;const a=Math.max(0,Math.sin(tt*2.2))*.85;
     if(a<.05)continue;const g=ctx.createRadialGradient(x,y,0,x,y,7);g.addColorStop(0,`rgba(214,255,140,${a})`);g.addColorStop(1,"rgba(214,255,140,0)");ctx.fillStyle=g;ctx.fillRect(x-7,y-7,14,14)}
@@ -111,11 +116,27 @@ function drawBackground(t){
   const hill=hex(colors.hill),gr=hex(colors.ground);
   ctx.fillStyle=mix(hill,hex(colors.bottom),.35);drawTrees(treesFar,hy-H*.03);
   ctx.fillStyle=colors.hill;ctx.fillRect(0,hy-H*.03,W,H*.04);
-  ctx.fillStyle=mix(hill,gr,.5);drawTrees(treesNear,hy+H*.005);
+  ctx.fillStyle=mix(hill,gr,.5);drawTrees(treesNear,hy+H*.005,XMAS);if(XMAS)drawBulbs(t*1000,hy+H*.005);
   const g=ctx.createLinearGradient(0,hy,0,H);g.addColorStop(0,mix(hill,gr,.5));g.addColorStop(1,colors.ground);ctx.fillStyle=g;ctx.fillRect(0,hy,W,H-hy);
+  if(XMAS){const s=ctx.createLinearGradient(0,hy,0,H);s.addColorStop(0,"rgba(200,215,235,.16)");s.addColorStop(1,"rgba(200,215,235,.05)");ctx.fillStyle=s;ctx.fillRect(0,hy,W,H-hy);drawBigTree(t*1000)}
 }
-function drawTrees(arr,base){ctx.beginPath();
-  for(const tr of arr){for(let k=0;k<3;k++){const yy=base-tr.h*k*.28,w=tr.w*(1-k*.22);ctx.moveTo(tr.x-w/2,yy);ctx.lineTo(tr.x,yy-tr.h*.55);ctx.lineTo(tr.x+w/2,yy)}}ctx.fill()}
+function drawTrees(arr,base,snowy){ctx.beginPath();
+  for(const tr of arr){for(let k=0;k<3;k++){const yy=base-tr.h*k*.28,w=tr.w*(1-k*.22);ctx.moveTo(tr.x-w/2,yy);ctx.lineTo(tr.x,yy-tr.h*.55);ctx.lineTo(tr.x+w/2,yy)}}ctx.fill();
+  if(!snowy)return;const fs=ctx.fillStyle;ctx.fillStyle="rgba(225,235,245,.55)";ctx.beginPath();
+  for(const tr of arr){for(let k=0;k<3;k++){const yy=base-tr.h*k*.28,w=tr.w*(1-k*.22),top=yy-tr.h*.55,q=.32;
+    ctx.moveTo(tr.x-w/2*q,top+tr.h*.55*q);ctx.lineTo(tr.x,top);ctx.lineTo(tr.x+w/2*q,top+tr.h*.55*q);ctx.closePath()}}ctx.fill();ctx.fillStyle=fs}
+function drawBulbs(t,base){ctx.save();ctx.globalCompositeOperation="lighter";
+  for(const b of bulbs){const on=.45+.55*Math.max(0,Math.sin(t/600+b.ph));const x=b.x,y=base+b.y;
+    const g=ctx.createRadialGradient(x,y,0,x,y,6);g.addColorStop(0,`rgba(${BULB[b.c]},${on})`);g.addColorStop(1,`rgba(${BULB[b.c]},0)`);ctx.fillStyle=g;ctx.fillRect(x-6,y-6,12,12)}
+  ctx.restore()}
+function drawBigTree(t){const hy=HY();const mob=W<640;const x=mob?W*.84:W*.8,base=hy+H*(mob?.09:.1),h=H*(mob?.2:.26),w=h*.62;
+  ctx.fillStyle="#3a2618";ctx.fillRect(x-w*.06,base-h*.08,w*.12,h*.1);
+  for(let k=0;k<4;k++){const yy=base-h*.08-k*h*.2,ww=w*(1-k*.2);ctx.fillStyle=k%2?"#163a2a":"#1b4532";ctx.beginPath();ctx.moveTo(x-ww/2,yy);ctx.lineTo(x,yy-h*.34);ctx.lineTo(x+ww/2,yy);ctx.closePath();ctx.fill()}
+  ctx.save();ctx.globalCompositeOperation="lighter";
+  for(let i=0;i<22;i++){const u=rnd(i*3.1),v=rnd(i*7.7);const yy=base-h*.12-u*h*.7;const half=w*.5*(1-(base-h*.12-yy)/(h*.85))*.85;const xx=x+(v*2-1)*half;
+    const on=.4+.6*Math.max(0,Math.sin(t/500+i));const c=BULB[i%4];const g=ctx.createRadialGradient(xx,yy,0,xx,yy,7);g.addColorStop(0,`rgba(${c},${on})`);g.addColorStop(1,`rgba(${c},0)`);ctx.fillStyle=g;ctx.fillRect(xx-7,yy-7,14,14)}
+  const sy=base-h*.08-3*h*.2-h*.34;const sp=.7+.3*Math.sin(t/300);const g=ctx.createRadialGradient(x,sy,0,x,sy,16*sp);g.addColorStop(0,"rgba(255,236,150,1)");g.addColorStop(1,"rgba(255,220,120,0)");ctx.fillStyle=g;ctx.fillRect(x-16,sy-16,32,32);
+  ctx.restore();ctx.fillStyle="#ffe58a";ctx.beginPath();for(let i=0;i<10;i++){const r=i%2?3.2:7.5,a=-Math.PI/2+i*Math.PI/5;ctx.lineTo(x+Math.cos(a)*r,sy+Math.sin(a)*r)}ctx.closePath();ctx.fill()}
 function drawGlow(I){const {cx,cy}=geom();const r=(150+320*I)*K;const c=glowRGB();
   ctx.save();ctx.globalCompositeOperation="lighter";
   const g=ctx.createRadialGradient(cx,cy,0,cx,cy,r);g.addColorStop(0,`rgba(${c},${.32*I})`);g.addColorStop(.45,`rgba(${c},${.12*I})`);g.addColorStop(1,`rgba(${c},0)`);
@@ -138,8 +159,13 @@ function drawPerson(st,I,t){const {p,x,y,s}=st;const {cx,cy,rx}=geom();
   ctx.fillStyle="rgba(0,0,0,.32)";ctx.beginPath();ctx.ellipse(x+(x-cx)*.06,y+2*s,22*s,5*s,0,0,6.283);ctx.fill();
   ctx.fillStyle=mix([18,24,23],[128,86,56],lit*.8);ctx.beginPath();ctx.moveTo(x-18*s,y);ctx.quadraticCurveTo(x-20*s,y-31*s,x,y-35*s);ctx.quadraticCurveTo(x+20*s,y-31*s,x+18*s,y);ctx.closePath();ctx.fill();
   ctx.fillStyle=mix([22,27,26],[160,112,76],lit*.85);ctx.beginPath();ctx.arc(x,y-43*s,10.5*s,0,6.283);ctx.fill();
-  ctx.fillStyle=`hsl(${p.hue} 55% ${18+30*lit}%)`;ctx.beginPath();ctx.arc(x,y-45*s,11*s,Math.PI,0);ctx.lineTo(x+11.5*s,y-43*s);ctx.lineTo(x-11.5*s,y-43*s);ctx.closePath();ctx.fill();
-  ctx.fillStyle=`hsl(${p.hue} 45% ${30+35*lit}%)`;ctx.beginPath();ctx.arc(x,y-57*s,3.4*s,0,6.283);ctx.fill();
+  if(XMAS){ctx.fillStyle=`hsl(${p.hue} 60% ${30+28*lit}%)`;ctx.beginPath();if(ctx.roundRect)ctx.roundRect(x-12*s,y-35*s,24*s,6*s,3*s);else ctx.rect(x-12*s,y-35*s,24*s,6*s);ctx.fill();
+    ctx.fillRect(x+4*s,y-31*s,5*s,10*s);
+    ctx.fillStyle=`hsl(356 70% ${26+26*lit}%)`;ctx.beginPath();ctx.moveTo(x-11*s,y-46*s);ctx.quadraticCurveTo(x-2*s,y-66*s,x+15*s,y-58*s);ctx.lineTo(x+11*s,y-46*s);ctx.closePath();ctx.fill();
+    ctx.fillStyle=`rgba(240,240,236,${.55+.4*lit})`;ctx.beginPath();if(ctx.roundRect)ctx.roundRect(x-12.5*s,y-48*s,25*s,5*s,2.5*s);else ctx.rect(x-12.5*s,y-48*s,25*s,5*s);ctx.fill();
+    ctx.beginPath();ctx.arc(x+15*s,y-57*s,3.6*s,0,6.283);ctx.fill()}
+  else{ctx.fillStyle=`hsl(${p.hue} 55% ${18+30*lit}%)`;ctx.beginPath();ctx.arc(x,y-45*s,11*s,Math.PI,0);ctx.lineTo(x+11.5*s,y-43*s);ctx.lineTo(x-11.5*s,y-43*s);ctx.closePath();ctx.fill();
+  ctx.fillStyle=`hsl(${p.hue} 45% ${30+35*lit}%)`;ctx.beginPath();ctx.arc(x,y-57*s,3.4*s,0,6.283);ctx.fill();}
   ctx.font=`500 ${Math.max(12,Math.round(13*K))}px "Pretendard Variable", Pretendard, "Apple SD Gothic Neo", sans-serif`;ctx.textAlign="center";ctx.textBaseline="top";
   ctx.fillStyle=`rgba(243,235,221,${.5+.4*lit})`;ctx.fillText((p.isMe?p.name+" (나)":p.name)+(p.away?" · 자리 비움":""),x,y+9*s);
   ctx.globalAlpha=1;
@@ -161,6 +187,8 @@ function drawRoasts(list,now){const {cx,cy}=geom();
       ctx.fillStyle="rgba(255,255,255,.35)";ctx.beginPath();ctx.ellipse(0,-Hh*.45,L*.6,Hh*.18,0,0,6.283);ctx.fill()}
     else if(k==="g"){ctx.ellipse(0,0,mw*1.55,mh*1.05,0,0,6.283);ctx.fill();ctx.stroke();
       if(sec>f.t[1]){ctx.fillStyle="rgba(255,196,64,.9)";ctx.beginPath();ctx.ellipse(mw*.4,-mh*.2,mw*.45,mh*.35,.3,0,6.283);ctx.fill()}}
+    else if(k==="b"){for(let i=-1;i<=1;i++){ctx.beginPath();ctx.fillStyle=roastColor(k,sec);ctx.ellipse(i*mw*.95,0,mw*.55,mh*.62,0,0,6.283);ctx.fill();ctx.stroke();
+        ctx.fillStyle=sec>f.t[0]?"rgba(250,214,140,.85)":"rgba(255,255,255,.25)";ctx.beginPath();ctx.ellipse(i*mw*.95,-mh*.15,mw*.22,mh*.12,0,0,6.283);ctx.fill()}}
     else{ctx.ellipse(0,0,mw*1.5,mh*.95,0,0,6.283);ctx.fill();ctx.stroke();ctx.fillStyle="rgba(255,250,210,.55)";
       for(let i=-2;i<=2;i++)for(let j=-1;j<=1;j++){ctx.beginPath();ctx.arc(i*mw*.5,j*mh*.48,1.4,0,6.283);ctx.fill()}
       ctx.fillStyle="#6f9a3e";ctx.beginPath();ctx.moveTo(-mw*1.45,0);ctx.lineTo(-mw*2.1,-mh*.9);ctx.lineTo(-mw*1.8,mh*.2);ctx.closePath();ctx.fill()}
@@ -278,7 +306,7 @@ function frame(t){
   st.filter(s=>s.y<cy).sort((a,b)=>a.y-b.y).forEach(s=>drawPerson(s,I,t));
   drawPit(I);drawFlames();drawFlying(st,t);
   st.filter(s=>s.y>=cy).sort((a,b)=>a.y-b.y).forEach(s=>drawPerson(s,I,t));
-  drawBubbles(st,t);drawRoasts(st,now);drawFloats(st,t);drawFireworks(t,dt);drawSnow(t,dt);
+  drawBubbles(st,t);drawRoasts(st,now);drawGifts(st,t);drawFloats(st,t);drawFireworks(t,dt);drawSnow(t,dt);
   const star=starAt(now);const show=!!star&&me.name&&(!me.wish||me.wish.s!==star.sl);
   if(wishBtn.hidden===show)wishBtn.hidden=!show;
   if(sfx&&sfx.on&&sfx.ready&&t-lastGain>1500){sfx.g.gain.setTargetAtTime(1.4+1.2*clamp(I,0,1.2),sfx.a.currentTime,.8);lastGain=t}
@@ -299,7 +327,7 @@ let enteredAt=0;
 function updateWho(){const n=people().length;const m=enteredAt?Math.floor((Date.now()-enteredAt)/60000):0;const tm=m>=1?` · ${m}분째 불멍 중`:"";
   $("#who").textContent=solo?"친구 연결이 안 되고 있어요. 새로고침해 보세요.":n<=1?"혼자 불을 지키는 중"+tm+". 초대 링크를 친구한테 보내 보세요.":`불 앞에 ${n}명`+tm}
 setInterval(updateWho,30000);
-function pushPresence(){if(!room||!me.name)return;room.presence({name:me.name,hue:me.hue,logs:me.logs,roast:me.roast,say:me.say,emo:me.emo,dust:me.dust,wish:me.wish,typing:me.typing,away:me.away,fw:me.fw,card:me.card,pick:me.pick,snow:me.snow,rk:me.rk,burn:me.burn,dice:me.dice}).catch(()=>{})}
+function pushPresence(){if(!room||!me.name)return;room.presence({name:me.name,hue:me.hue,logs:me.logs,roast:me.roast,say:me.say,emo:me.emo,dust:me.dust,wish:me.wish,typing:me.typing,away:me.away,fw:me.fw,card:me.card,pick:me.pick,snow:me.snow,rk:me.rk,burn:me.burn,dice:me.dice,gift:me.gift}).catch(()=>{})}
 function needName(){if(!me.name){openSit();return true}return false}
 
 const sit=$("#sit"),nameInput=$("#nameInput"),sw=$("#swatches");
@@ -335,7 +363,7 @@ emoBtn.addEventListener("click",()=>toggleTray("emo"));
 $("#funBtn").addEventListener("click",()=>toggleTray("fun"));
 const wishBtn=$("#wishBtn");
 wishBtn.addEventListener("click",()=>{const s=starAt(Date.now());if(!s||needName())return;me.wish={s:s.sl,at:Date.now()};
-  floats.push({id:"SELF",text:"🌠 소원 빌었어요",t0:performance.now()});wishBtn.hidden=true;pushPresence()});
+  floats.push({id:"SELF",text:"🌠 소원 빌었어요",t0:performance.now()});wishBtn.hidden=true;pushPresence();setTimeout(()=>offerCard("wish"),900)});
 let lastSay=0;
 $("#chatForm").addEventListener("submit",e=>{e.preventDefault();if(needName())return;const inp=$("#chatInput");const text=clean(inp.value,80);if(!text)return;
   const now=Date.now();if(now-lastSay<700)return;lastSay=now;me.say={t:text,at:now};bubbles.set("SELF",{text,t0:performance.now()});
@@ -343,8 +371,15 @@ $("#chatForm").addEventListener("submit",e=>{e.preventDefault();if(needName())re
 
 
 /* ---------- 놀거리: 폭죽 · 이야기 카드 · 제비뽑기 · 눈 ---------- */
-const QUESTIONS=["요즘 제일 자주 듣는 노래는?","지금 당장 떠날 수 있다면 어디로?","살면서 먹은 최고의 야식은?","10년 전 나한테 해주고 싶은 말은?","요즘 빠져 있는 거 하나만","무인도에 딱 세 개 가져간다면?","가장 기억에 남는 여행은?","최근에 제일 크게 웃었던 일은?","인생 영화나 드라마 하나 꼽자면?","어릴 때 꿈은 뭐였어?","하루 동안 다른 사람으로 살 수 있다면 누구?","올해 안에 꼭 해보고 싶은 거 하나","제일 좋아하는 계절이랑 그 이유는?","요즘 고민 하나 털어놓기","나만 아는 맛집 하나 풀기","첫 월급으로 뭐 했어?","가장 무서웠던 경험은?","지금 이 자리에 있는 사람 첫인상 하나","돈 걱정 없으면 뭐 하면서 살래?","최근에 산 것 중 제일 잘 산 거","잠 안 올 때 뭐 해?","내 인생 노래방 18번은?","지금까지 받은 최고의 선물은?","다시 태어나면 뭐로 태어나고 싶어?","요즘 나를 웃게 하는 작은 것","제일 오래된 친구 이야기 하나","자기 전에 꼭 하는 습관은?","한 가지 초능력을 가질 수 있다면?","올해 나에게 점수를 준다면 몇 점?","혼자 있을 때 제일 좋아하는 시간은?","살면서 제일 잘한 선택은?","요즘 제일 듣고 싶은 말은?","라면 끓일 때 나만의 비법은?","가장 최근에 운 건 언제?","10년 뒤 오늘 나는 뭐 하고 있을까?","무조건 추천하는 유튜브 채널 하나","내 MBTI 맞는 것 같아, 아닌 것 같아?","밸런스 게임: 평생 여름 vs 평생 겨울","밸런스 게임: 과거로 가기 vs 미래 보기","밸런스 게임: 평생 라면 금지 vs 평생 치킨 금지"];
-const fireworks=[],sparksFw=[],snowflakes=[];let snowUntil=0;
+const QUESTIONS=["올해 받고 싶은 크리스마스 선물은?","올해 제일 고마웠던 사람은?","올해 나한테 상 하나 준다면 무슨 상?","산타한테 딱 하나만 빌 수 있다면?","기억에 남는 크리스마스 있어?","내년엔 이것만은 꼭!","올해의 나를 한 단어로 하면?","크리스마스에 꼭 먹어야 하는 음식은?","요즘 제일 자주 듣는 노래는?","지금 당장 떠날 수 있다면 어디로?","살면서 먹은 최고의 야식은?","10년 전 나한테 해주고 싶은 말은?","요즘 빠져 있는 거 하나만","무인도에 딱 세 개 가져간다면?","가장 기억에 남는 여행은?","최근에 제일 크게 웃었던 일은?","인생 영화나 드라마 하나 꼽자면?","어릴 때 꿈은 뭐였어?","하루 동안 다른 사람으로 살 수 있다면 누구?","올해 안에 꼭 해보고 싶은 거 하나","제일 좋아하는 계절이랑 그 이유는?","요즘 고민 하나 털어놓기","나만 아는 맛집 하나 풀기","첫 월급으로 뭐 했어?","가장 무서웠던 경험은?","지금 이 자리에 있는 사람 첫인상 하나","돈 걱정 없으면 뭐 하면서 살래?","최근에 산 것 중 제일 잘 산 거","잠 안 올 때 뭐 해?","내 인생 노래방 18번은?","지금까지 받은 최고의 선물은?","다시 태어나면 뭐로 태어나고 싶어?","요즘 나를 웃게 하는 작은 것","제일 오래된 친구 이야기 하나","자기 전에 꼭 하는 습관은?","한 가지 초능력을 가질 수 있다면?","올해 나에게 점수를 준다면 몇 점?","혼자 있을 때 제일 좋아하는 시간은?","살면서 제일 잘한 선택은?","요즘 제일 듣고 싶은 말은?","라면 끓일 때 나만의 비법은?","가장 최근에 운 건 언제?","10년 뒤 오늘 나는 뭐 하고 있을까?","무조건 추천하는 유튜브 채널 하나","내 MBTI 맞는 것 같아, 아닌 것 같아?","밸런스 게임: 평생 여름 vs 평생 겨울","밸런스 게임: 과거로 가기 vs 미래 보기","밸런스 게임: 평생 라면 금지 vs 평생 치킨 금지"];
+const fireworks=[],sparksFw=[],snowflakes=[],gifts=[];let snowUntil=0;
+function sendGiftAnim(fromId,toKey,item){gifts.push({from:fromId,to:toKey,item,t0:performance.now()})}
+function drawGifts(list,t){const byId=new Map(list.map(st=>[st.p.id,st])),byKey=new Map(list.map(st=>[st.p.key,st]));
+  for(let i=gifts.length-1;i>=0;i--){const g=gifts[i];const a=byId.get(g.from),b=byKey.get(g.to);const u=(t-g.t0)/1100;
+    if(!a||!b){gifts.splice(i,1);continue}
+    if(u>=1){gifts.splice(i,1);floats.push({id:b.p.id,text:"🎁 "+g.item,t0:t});continue}
+    const x=lerp(a.x,b.x,u),y=lerp(a.y-40*a.s,b.y-40*b.s,u)-Math.sin(u*Math.PI)*120*K;
+    ctx.font=`${Math.round(26*K)}px sans-serif`;ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText("🎁",x,y)}}
 function launchFirework(x,h){fireworks.push({x,h,t0:performance.now()});crackle()}
 function drawFireworks(t,dt){
   ctx.save();ctx.globalCompositeOperation="lighter";
@@ -357,10 +392,10 @@ function drawFireworks(t,dt){
     ctx.fillStyle=`hsl(${p.h} 95% 68%)`;ctx.beginPath();ctx.arc(p.x,p.y,1.8,0,6.283);ctx.fill()}
   ctx.restore();ctx.globalAlpha=1}
 function drawSnow(t,dt){const now=Date.now();
-  if(now<snowUntil&&snowflakes.length<(reduce?60:160))snowflakes.push({x:Math.random()*W,y:-10,vy:(25+Math.random()*35),r:1+Math.random()*2.2,ph:Math.random()*6});
+  const heavy=now<snowUntil,amb=XMAS&&!reduce?(W<640?28:50):0;if((heavy&&snowflakes.length<(reduce?60:160))||(!heavy&&snowflakes.length<amb&&Math.random()<.3))snowflakes.push({x:Math.random()*W,y:-10,vy:(25+Math.random()*35),r:1+Math.random()*2.2,ph:Math.random()*6});
   ctx.fillStyle="rgba(255,255,255,.85)";
   for(let i=snowflakes.length-1;i>=0;i--){const f=snowflakes[i];f.y+=f.vy*dt;f.x+=Math.sin(t/900+f.ph)*12*dt;
-    if(f.y>H+10){if(now<snowUntil){f.y=-10;f.x=Math.random()*W}else{snowflakes.splice(i,1);continue}}
+    if(f.y>H+10){if(heavy||snowflakes.length<=amb){f.y=-10;f.x=Math.random()*W}else{snowflakes.splice(i,1);continue}}
     ctx.beginPath();ctx.arc(f.x,f.y,f.r,0,6.283);ctx.fill()}}
 let qTimer=null;
 function showCard(i,by){if(!(i>=0&&i<QUESTIONS.length))return;$("#qwho").textContent=`💬 ${by}님이 꺼낸 이야기`;$("#qtext").textContent=QUESTIONS[i];
@@ -383,9 +418,13 @@ $("#burnBtn").addEventListener("click",()=>{if(needName())return;toggleTray("non
 $("#burnCancel").addEventListener("click",()=>{burnBox.hidden=true});
 $("#burnForm").addEventListener("submit",e=>{e.preventDefault();if(!$("#burnText").value.trim())return;$("#burnText").value="";burnBox.hidden=true;
   me.burn={at:Date.now()};flying.push({id:"SELF",t0:performance.now(),paper:true});floats.push({id:"SELF",text:"훨훨 날려 보냈어요",t0:performance.now()+700});
-  addLine("",0,`${me.name}님이 고민 하나를 불에 태웠어요`,true);pushPresence()});
+  addLine("",0,`${me.name}님이 고민 하나를 불에 태웠어요`,true);pushPresence();setTimeout(()=>offerCard("burn"),1400)});
 $("#diceBtn").addEventListener("click",()=>{if(needName())return;const v=1+Math.floor(Math.random()*6);me.dice={v,at:Date.now()};
   floats.push({id:"SELF",text:"🎲 "+v,t0:performance.now()});addLine("",0,`${me.name}님 주사위: ${v}`,true);pushPresence()});
+
+$("#giftBtn").addEventListener("click",()=>{if(needName())return;const others=people().filter(p=>!p.isMe);
+  if(!others.length){toast("선물 줄 사람이 아직 없어요");return}const to=others[Math.floor(Math.random()*others.length)];const item=GIFTS[Math.floor(Math.random()*GIFTS.length)];
+  me.gift={to:to.key,name:to.name,i:GIFTS.indexOf(item),at:Date.now()};sendGiftAnim("SELF",to.key,item);addLine("",0,`${me.name}님이 ${to.name}님에게 선물을 줬어요: ${item}`,true);toggleTray("none");pushPresence()});
 
 /* ---------- 모바일 메뉴 ---------- */
 const menuBtn=$("#menuBtn"),scrim=$("#scrim");
@@ -410,11 +449,24 @@ photoBtn.addEventListener("click",async()=>{
   const c=document.createElement("canvas");c.width=canvas.width;c.height=canvas.height;const g=c.getContext("2d");g.drawImage(canvas,0,0);
   const d=new Date(),p2=n=>String(n).padStart(2,"0");const day=`${d.getFullYear()}.${p2(d.getMonth()+1)}.${p2(d.getDate())}`;
   g.font=`700 ${Math.round(22*DPR)}px "Gowun Batang", serif`;g.fillStyle="rgba(255,236,200,.85)";g.textAlign="right";g.textBaseline="bottom";
-  g.fillText(day+" 모닥불",c.width-24*DPR,c.height-24*DPR);
+  g.fillText(day+(XMAS?" 🎄 모닥불":" 모닥불"),c.width-24*DPR,c.height-46*DPR);
+  g.font=`500 ${Math.round(14*DPR)}px "Pretendard Variable", Pretendard, sans-serif`;g.fillStyle="rgba(255,236,200,.7)";g.fillText(location.host,c.width-24*DPR,c.height-24*DPR);
   const fl=document.createElement("div");fl.style.cssText="position:fixed;inset:0;background:#fff;opacity:.8;pointer-events:none;transition:opacity .6s";
   document.body.appendChild(fl);requestAnimationFrame(()=>{fl.style.opacity="0";setTimeout(()=>fl.remove(),700)});
   const blob=await new Promise(r=>c.toBlob(r,"image/png"));if(!blob)return;
   await deliverPhoto(blob,`모닥불_${day.replace(/\./g,"")}_${p2(d.getHours())}${p2(d.getMinutes())}.png`)});
+let cardKind=null,cardTimer=null;const shareCardBtn=$("#shareCardBtn");
+function offerCard(kind){cardKind=kind;shareCardBtn.hidden=false;clearTimeout(cardTimer);cardTimer=setTimeout(()=>{shareCardBtn.hidden=true},9000)}
+shareCardBtn.addEventListener("click",async()=>{shareCardBtn.hidden=true;const k=cardKind;
+  const Wc=1080,Hc=1350;const c=document.createElement("canvas");c.width=Wc;c.height=Hc;const g=c.getContext("2d");
+  g.fillStyle="#0b141c";g.fillRect(0,0,Wc,Hc);const sc=Math.max(Wc/canvas.width,Hc/canvas.height);const sw2=canvas.width*sc,sh2=canvas.height*sc;
+  g.globalAlpha=.85;g.drawImage(canvas,(Wc-sw2)/2,(Hc-sh2)/2,sw2,sh2);g.globalAlpha=1;
+  const gr=g.createLinearGradient(0,Hc*.45,0,Hc);gr.addColorStop(0,"rgba(5,8,12,0)");gr.addColorStop(1,"rgba(5,8,12,.88)");g.fillStyle=gr;g.fillRect(0,0,Wc,Hc);
+  const yr=new Date().getFullYear();const title=k==="burn"?`${yr}년의 고민 하나,\n모닥불에 태웠어요`:`별똥별에\n소원을 빌었어요`;const em=k==="burn"?"📜🔥":"🌠";
+  g.textAlign="center";g.fillStyle="#fff2dc";g.font='120px sans-serif';g.fillText(em,Wc/2,Hc*.66);
+  g.font='700 76px "Gowun Batang", serif';title.split("\n").forEach((l,i)=>g.fillText(l,Wc/2,Hc*.76+i*96));
+  g.font='500 34px "Pretendard Variable", Pretendard, sans-serif';g.fillStyle="rgba(255,236,200,.75)";g.fillText((XMAS?"🎄 ":"")+"모닥불 · "+location.host,Wc/2,Hc*.95);
+  const blob=await new Promise(r=>c.toBlob(r,"image/png"));if(blob)await deliverPhoto(blob,`모닥불_${k}_${Date.now()}.png`)});
 async function deliverPhoto(blob,filename){
   const file=new File([blob],filename,{type:"image/png"});
   if(/Android|iPhone|iPad/i.test(navigator.userAgent)&&navigator.canShare&&navigator.canShare({files:[file]})){
@@ -431,11 +483,14 @@ function onPeers(ch){const t=performance.now();const early=t-loadedAt<3000;
     const roast=Number.isFinite(pr.roast)?pr.roast:null;
     const sayAt=pr.say&&Number.isFinite(pr.say.at)?pr.say.at:0,emoAt=pr.emo&&Number.isFinite(pr.emo.at)?pr.emo.at:0,
       dustAt=pr.dust&&Number.isFinite(pr.dust.at)?pr.dust.at:0,wishAt=pr.wish&&Number.isFinite(pr.wish.at)?pr.wish.at:0;
-    const at=o=>o&&typeof o==="object"&&Number.isFinite(o.at)?o.at:0;const fwAt=at(pr.fw),cardAt=at(pr.card),pickAt=at(pr.pick),snowAt=at(pr.snow),burnAt=at(pr.burn),diceAt=at(pr.dice);const rk=foodOf(pr.rk);
+    const at=o=>o&&typeof o==="object"&&Number.isFinite(o.at)?o.at:0;const giftAt=at(pr.gift),fwAt=at(pr.fw),cardAt=at(pr.card),pickAt=at(pr.pick),snowAt=at(pr.snow),burnAt=at(pr.burn),diceAt=at(pr.dice);const rk=foodOf(pr.rk);
     const prev=known.get(p.peer);const fresh=v=>v&&Math.abs(Date.now()-v)<15000;
     if(prev&&prev.name&&name){
       if(lastLog&&lastLog!==prev.lastLog&&fresh(lastLog))flying.push({id:p.peer,t0:t});
       if(prev.roast!=null&&roast==null)floats.push({id:p.peer,text:FOODS[prev.rk||"m"].e+" "+verdict(prev.rk,(Date.now()-prev.roast)/1000),t0:t});
+      if(giftAt&&giftAt!==prev.giftAt&&fresh(giftAt)&&typeof pr.gift.to==="string"&&GIFTS[pr.gift.i]){const item=GIFTS[pr.gift.i];const toKey=pr.gift.to;
+        const mine=myPeer&&toKey===myPeer;const tn=mine?me.name:clean(pr.gift.name);sendGiftAnim(p.peer,toKey,item);
+        addLine("",0,`${name}님이 ${tn}님에게 선물을 줬어요: ${item}`,true);if(mine)toast(`🎁 ${name}님이 ${item}을(를) 줬어요!`)}
       if(burnAt&&burnAt!==prev.burnAt&&fresh(burnAt)){flying.push({id:p.peer,t0:t,paper:true});addLine("",0,`${name}님이 고민 하나를 불에 태웠어요`,true)}
       if(diceAt&&diceAt!==prev.diceAt&&fresh(diceAt)&&Number.isInteger(pr.dice.v)&&pr.dice.v>=1&&pr.dice.v<=6){floats.push({id:p.peer,text:"🎲 "+pr.dice.v,t0:t});addLine("",0,`${name}님 주사위: ${pr.dice.v}`,true)}
       if(sayAt&&sayAt!==prev.sayAt&&fresh(sayAt)){const text=clean(pr.say.t,80);if(text){bubbles.set(p.peer,{text,t0:t});addLine(name,hue,text)}}
@@ -447,7 +502,7 @@ function onPeers(ch){const t=performance.now();const early=t-loadedAt<3000;
       if(pickAt&&pickAt!==prev.pickAt&&fresh(pickAt)){const pn=clean(pr.pick.name);if(pn)showPick(pn,name)}
       if(snowAt&&snowAt!==prev.snowAt&&fresh(snowAt)){snowUntil=Math.max(snowUntil,Date.now()+40000);addLine("",0,`${name}님이 눈을 내렸어요`,true)}
     }else if(name&&(!prev||!prev.name)&&!early){toast(`${name}님이 불 앞에 앉았어요`);addLine("",0,`${name}님이 불 앞에 앉았어요`,true)}
-    known.set(p.peer,{lastLog,roast,rk,name,sayAt,emoAt,dustAt,wishAt,fwAt,cardAt,pickAt,snowAt,burnAt,diceAt})}
+    known.set(p.peer,{giftAt,lastLog,roast,rk,name,sayAt,emoAt,dustAt,wishAt,fwAt,cardAt,pickAt,snowAt,burnAt,diceAt})}
   for(const p of ch.left){const k=known.get(p.peer);if(k&&k.name){toast(`${k.name}님이 자리를 떴어요`);addLine("",0,`${k.name}님이 자리를 떴어요`,true)}known.delete(p.peer);bubbles.delete(p.peer)}
   updateWho()}
 function goSolo(){room=null;solo=true;updateWho()}
@@ -531,13 +586,19 @@ function leaveRoom(){
   clearTimeout(pwCheck);unannounce(roomId);
   if(room){room.leave();room=null}
   lastRoom={id:roomId,name:roomName,lock:!!roomPw,hidden:roomHidden};musicAction=null;
-  known.clear();bubbles.clear();flying.length=0;floats.length=0;myPeer=null;snowUntil=0;$("#qcard").hidden=true;
+  known.clear();bubbles.clear();flying.length=0;floats.length=0;gifts.length=0;myPeer=null;snowUntil=0;$("#qcard").hidden=true;
   if(me.roast!=null){me.roast=null;setRoastLabel()}
   if(listening){listening=false;music.pause();curSrc="";refreshMusicUI()}
   enteredAt=0;logEl.textContent="";roomTitleEl.textContent="";roomId="";roomName="";roomPw="";roomHidden=false;toggleTray("none");
   $("#joinInput").value="";history.replaceState(null,"",location.pathname);showLobby(lastRoom);
 }
 $("#leaveBtn").addEventListener("click",leaveRoom);
+const PLAZA_MAX=8;
+$("#plazaBtn").addEventListener("click",async()=>{const b=$("#plazaBtn");b.disabled=true;b.textContent="빈자리 찾는 중…";
+  const wait=4500-(Date.now()-lobbyStart);if(wait>0)await new Promise(r=>setTimeout(r,wait));
+  const taken=new Map();for(const e of ads.values()){const m=/^plaza-(\d+)$/.exec(e.id);if(m)taken.set(+m[1],e.n)}
+  let i=1;while(i<200&&(taken.get(i)||0)>=PLAZA_MAX)i++;
+  b.disabled=false;b.textContent=(XMAS?"🎄 ":"🔥 ")+"광장 모닥불 바로 앉기";enterRoom("plaza-"+i,"광장 모닥불 "+i)});
 $("#rejoinBtn").addEventListener("click",()=>{if(lastRoom)enterRoom(lastRoom.id,lastRoom.name,{lock:lastRoom.lock,hidden:lastRoom.hidden})});
 $("#openCreate").addEventListener("click",()=>{const f=$("#createForm");f.hidden=!f.hidden;$("#openCreate").hidden=!f.hidden;if(!f.hidden)$("#roomNameInput").focus()});
 $("#createBtn").addEventListener("click",()=>{const pw=$("#roomPwInput").value;
@@ -547,6 +608,7 @@ $("#joinForm").addEventListener("submit",e=>{e.preventDefault();const v=$("#join
   let id=v,name="",lock=false,hidden=false;try{const u=new URL(v);id=u.searchParams.get("room")||"";name=u.searchParams.get("name")||"";lock=u.searchParams.get("lock")==="1";hidden=u.searchParams.get("hidden")==="1"}catch(err){}
   id=cleanId(id);if(!id){toast("방 코드를 다시 확인해 주세요");return}const ad=ads.get(id);if(ad&&ad.lock)lock=true;enterRoom(id,name||(ad&&ad.name)||"",{lock,hidden})});
 $("#inviteBtn").addEventListener("click",async()=>{const url=location.origin+roomUrl();const msg=roomPw?"링크를 복사했어요. 비밀번호는 따로 알려 주세요":"링크를 복사했어요. 친구한테 보내 주세요";
+  if(navigator.share&&/Android|iPhone|iPad/i.test(navigator.userAgent)){try{await navigator.share({title:"모닥불",text:`${me.name||"친구"}님이 모닥불에 초대했어요${roomName?" ("+roomName+")":""}`+(roomPw?" · 비밀번호는 따로 물어보세요":""),url});return}catch(e){if(e&&e.name==="AbortError")return}}
   try{await navigator.clipboard.writeText(url);toast(msg)}catch(e){window.prompt("이 링크를 친구한테 보내 주세요",url)}});
 (async()=>{
   resize();requestAnimationFrame(frame);refreshMusicUI();loadTracks();initLobby();
@@ -554,3 +616,4 @@ $("#inviteBtn").addEventListener("click",async()=>{const url=location.origin+roo
   if(id)enterRoom(id,params.get("name")||"",{lock:params.get("lock")==="1",hidden:params.get("hidden")==="1"});else showLobby(null);
 })();
 })();
+
