@@ -172,3 +172,8 @@ body.in-lobby #menuBtn,body.in-lobby .top h1,body.in-lobby .dock,body.in-lobby .
   #qcard .q{font-size:17px}
 }
 @media (max-width:520px){ .btn{font-size:14px;padding:10px 14px} #who{font-size:13px} #vol{width:84px} }
+.xm{font-size:.6em;margin-left:6px;vertical-align:middle}
+.badge{display:inline-block;font-size:12px;padding:4px 10px;border-radius:999px;background:rgba(200,40,50,.22);border:1px solid rgba(255,120,120,.35);color:#ffd7d2;margin-bottom:10px}
+.btn.plaza{width:100%;font-size:17px;padding:14px;margin:4px 0 18px;background:linear-gradient(135deg,#c8323c,#e8752f);color:#fff7ee;box-shadow:0 6px 24px rgba(220,60,50,.35)}
+#shareCardBtn{background:#6b2430;border-color:#ff9f9f;color:#fff0ec}
+.credit-fixed a{text-decoration:underline}
