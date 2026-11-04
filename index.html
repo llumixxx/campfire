@@ -6,7 +6,7 @@
 <title>모닥불</title>
 <meta name="description" content="친구들이랑 말없이 같이 불 쬐는 곳">
 <meta property="og:title" content="모닥불">
-<meta property="og:description" content="친구들이랑 말없이 같이 불 쬐는 곳. 장작 넣고, 마시멜로 굽고, 별똥별에 소원 빌기.">
+<meta property="og:description" content="🎄 크리스마스엔 다 같이 불멍. 장작 넣고, 군밤 굽고, 선물 주고, 별똥별에 소원 빌기.">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://campfire-self.vercel.app/og.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -16,14 +16,14 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Gowun+Dodum&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=6">
+<link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
 <canvas id="scene" aria-label="모닥불 앞에 사람들이 둘러앉아 있는 장면"></canvas>
 
 <div class="top">
   <div>
-    <h1>모닥불</h1>
+    <h1>모닥불<span class="xm">🎄</span></h1>
     <p id="roomTitle"></p>
     <p id="who">불을 피우는 중</p>
   </div>
@@ -51,12 +51,14 @@
 <div class="dock">
   <div id="log" aria-live="polite"></div>
   <button class="btn wish" id="wishBtn" type="button" hidden>별똥별이다! 소원 빌기</button>
+  <button class="btn wish" id="shareCardBtn" type="button" hidden>📸 카드로 저장해서 자랑하기</button>
   <div class="emotes" id="emotes" hidden></div>
   <div class="tray" id="roastTray" hidden>
     <button class="chip food" type="button" data-k="m">🍡 마시멜로</button>
     <button class="chip food" type="button" data-k="s">🌭 소시지</button>
     <button class="chip food" type="button" data-k="g">🍠 고구마</button>
     <button class="chip food" type="button" data-k="c">🌽 옥수수</button>
+    <button class="chip food" type="button" data-k="b">🌰 군밤</button>
   </div>
   <div class="tray" id="funTray" hidden>
     <button class="chip" id="fwBtn" type="button">🎆 폭죽 쏘기</button>
@@ -64,6 +66,7 @@
     <button class="chip" id="pickBtn" type="button">🎯 제비뽑기</button>
     <button class="chip" id="snowBtn" type="button">❄️ 눈 내리기</button>
     <button class="chip" id="burnBtn" type="button">📜 고민 태우기</button>
+    <button class="chip" id="giftBtn" type="button">🎁 선물 주기</button>
     <button class="chip" id="diceBtn" type="button">🎲 주사위</button>
   </div>
   <div class="acts">
@@ -79,12 +82,14 @@
   </form>
 </div>
 
-<div class="credit-fixed">made by 송광진<br><a href="mailto:9544182@naver.com">9544182@naver.com</a></div>
+<div class="credit-fixed">made by 송광진 · 캐치밀리스튜디오<br><a href="mailto:9544182@naver.com?subject=%5B%EB%AA%A8%EB%8B%A5%EB%B6%88%5D%20%EB%AC%B8%EC%9D%98">이런 거 만들어 드려요 · 문의</a></div>
 
 <div class="lobby" id="lobby" hidden>
   <div class="card">
+    <span class="badge">🎄 크리스마스 에디션</span>
     <h2 class="big">모닥불</h2>
-    <p>친구들이랑 말없이 같이 불 쬐는 곳. 열린 방에 앉거나 새 방을 만들어 보세요.</p>
+    <p>말없이 같이 불 쬐는 곳. 혼자 와도 괜찮아요, 광장에 누군가 앉아 있어요.</p>
+    <button class="btn primary plaza" id="plazaBtn" type="button">🎄 광장 모닥불 바로 앉기</button>
     <div class="rejoin" id="rejoin" hidden>
       <span id="rejoinText">불 앞에서 일어났어요.</span>
       <button class="btn" id="rejoinBtn" type="button">다시 앉기</button>
@@ -92,7 +97,7 @@
     <div class="sec-h"><h3>열린 방</h3><span id="roomCount"></span></div>
     <input id="roomSearch" type="search" placeholder="방 이름이나 코드로 찾기" aria-label="방 찾기">
     <div class="rlist" id="rlist"><p class="rempty">방을 찾는 중이에요…</p></div>
-    <button class="btn primary" id="openCreate" type="button">새 방 만들기</button>
+    <button class="btn" id="openCreate" type="button">친구들끼리 새 방 만들기</button>
     <div class="createForm" id="createForm" hidden>
       <label for="roomNameInput">방 이름</label>
       <input id="roomNameInput" maxlength="20" placeholder="예: 금요일 밤 모닥불">
@@ -108,7 +113,7 @@
       <input id="joinInput" placeholder="초대 링크나 방 코드" aria-label="초대 링크나 방 코드">
       <button class="btn" type="submit">들어가기</button>
     </form>
-    <p class="credit">made by 송광진<br><a href="mailto:9544182@naver.com">9544182@naver.com</a><br>모닥불 소리: <a href="https://commons.wikimedia.org/wiki/File:Campfire_sound_ambience.ogg" target="_blank" rel="noopener">Glaneur de sons</a> (CC BY 3.0)</p>
+    <p class="credit">made by 송광진 · 캐치밀리스튜디오<br><a href="mailto:9544182@naver.com?subject=%5B%EB%AA%A8%EB%8B%A5%EB%B6%88%5D%20%EB%AC%B8%EC%9D%98">브랜드 캠페인, 이런 사이트 제작 문의 · 9544182@naver.com</a><br>모닥불 소리: <a href="https://commons.wikimedia.org/wiki/File:Campfire_sound_ambience.ogg" target="_blank" rel="noopener">Glaneur de sons</a> (CC BY 3.0)</p>
   </div>
 </div>
 
@@ -145,6 +150,6 @@
     <button class="btn primary" type="submit">앉기</button>
   </form>
 </div>
-<script src="app.js?v=6"></script>
+<script src="app.js?v=7"></script>
 </body>
 </html>
