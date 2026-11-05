@@ -15,8 +15,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=10">
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Gowun+Dodum&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css?v=11">
 </head>
 <body>
 <canvas id="scene" aria-label="모닥불 앞에 사람들이 둘러앉아 있는 장면"></canvas>
@@ -48,20 +48,18 @@
 <div id="qcard" hidden role="status"><p class="who" id="qwho"></p><p class="q" id="qtext"></p><button type="button" id="qclose" aria-label="닫기">×</button></div>
 <div id="banner" aria-live="polite"></div>
 
-<div class="chatpanel" id="chatPanel">
-  <div class="cp-head" id="cpHead">
-    <span class="cp-title">💬 대화</span>
-    <div class="cp-btns">
-      <button type="button" id="cpSmaller" aria-label="대화창 작게">－</button>
-      <button type="button" id="cpBigger" aria-label="대화창 크게">＋</button>
-      <button type="button" id="cpMove" aria-label="대화창 위아래로 옮기기">위로</button>
-      <button type="button" id="cpFold" aria-label="대화창 접기">접기</button>
-    </div>
-  </div>
-  <div id="log" aria-live="polite"></div>
-</div>
-
 <div class="dock">
+  <div class="chatpanel" id="chatPanel">
+    <div class="cp-head" id="cpHead">
+      <span class="cp-title">대화</span>
+      <div class="cp-btns">
+        <button type="button" id="cpSmaller" aria-label="대화 글씨 작게">가－</button>
+        <button type="button" id="cpBigger" aria-label="대화 글씨 크게">가＋</button>
+        <button type="button" id="cpMove">옮기기</button>
+      </div>
+    </div>
+    <div id="log" aria-live="polite"></div>
+  </div>
   <button class="btn wish" id="wishBtn" type="button" hidden>별똥별이다! 소원 빌기</button>
   <button class="btn wish" id="shareCardBtn" type="button" hidden>📸 카드로 저장해서 자랑하기</button>
   <div class="emotes" id="emotes" hidden></div>
@@ -100,7 +98,7 @@
 <div class="lobby" id="lobby" hidden>
   <div class="card">
     <span class="badge">🎄 크리스마스 에디션</span>
-    <h2 class="big">모닥불🔥</h2>
+    <h2 class="big">모닥불</h2>
     <p>말없이 같이 불 쬐는 곳. 혼자 와도 괜찮아요, 광장에 누군가 앉아 있어요.</p>
     <button class="btn primary plaza" id="plazaBtn" type="button">🎄 광장 모닥불 바로 앉기</button>
     <div class="rejoin" id="rejoin" hidden>
@@ -166,6 +164,6 @@
 </div>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
-<script src="app.js?v=10"></script>
+<script src="app.js?v=11"></script>
 </body>
 </html>
